@@ -128,7 +128,7 @@ admissionFee,
   }
 };
 
-
 module.exports = {
-  createStudent
+  createStudent,
+ 
 };
