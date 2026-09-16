@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 require("dotenv").config();
 
 const studentRoutes = require("./routes/students");
+const batchRoutes= require("./routes/batchRoute");
 
 const app = express();
 
@@ -13,6 +14,7 @@ app.use(express.json());
 
 // Routes
 app.use("/api/students", studentRoutes);
+app.use("/api/batch", batchRoutes);
 
 // Test
 app.get("/", (req, res) => {
