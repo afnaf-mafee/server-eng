@@ -14,7 +14,7 @@ app.use(express.json());
 
 // Routes
 app.use("/api/students", studentRoutes);
-app.use("/api/batch", batchRoutes);
+app.use("/api/batches", batchRoutes);
 
 // Test
 app.get("/", (req, res) => {

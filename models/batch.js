@@ -5,18 +5,7 @@ const batchSchema = new mongoose.Schema(
 
   {
 
-    batchName: {
-
-      type: String,
-
-      required: true,
-
-      trim: true,
-
-      maxlength: 100,
-
-    },
-
+ 
 
     className: {
 
@@ -49,17 +38,7 @@ const batchSchema = new mongoose.Schema(
 
       required: true,
 
-      validate: {
-
-        validator: function(value) {
-
-          return value.length > 0 && value.length <= 3;
-
-        },
-
-        message: "Select minimum 1 and maximum 3 days"
-
-      }
+    
 
     },
 
@@ -70,34 +49,18 @@ const batchSchema = new mongoose.Schema(
 
       required: true,
 
-      enum: [
-
-        "দুপুর",
-
-        "বিকেল",
-
-        "সন্ধ্যা"
-
-      ],
+     
+     enum: [
+  "Morning",
+  "Afternoon",
+  "Evening",
+  "Night"
+],
 
     },
 
 
-    status: {
-
-      type: String,
-
-      enum: [
-
-        "Active",
-
-        "Inactive"
-
-      ],
-
-      default: "Active"
-
-    },
+   
 
 
   },
