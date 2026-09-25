@@ -9,27 +9,54 @@ const {
   updateStudent,
   deleteStudent,
   addFeePayment,
-    markAttendance,
+  markAttendance,
+  bulkMarkAttendance
 } = require("../controllers/studentController");
 
-
-// Create Student
+// =========================
+// CREATE STUDENT
+// POST /students
+// =========================
 router.post("/", createStudent);
 
-// Get All Students
+// =========================
+// GET ALL STUDENTS
+// GET /students
+// =========================
 router.get("/", getStudents);
 
-// Get Single Student
-router.get("/:id", getStudentById);
-
-// Update Student
-router.put("/:id", updateStudent);
-// Add fee payment
+// =========================
+// ADD FEE PAYMENT
+// POST /students/:id/fee-payment
+// =========================
 router.post("/:id/fee-payment", addFeePayment);
-// Delete Student
-router.delete("/:id", deleteStudent);
+
+// =========================
+// MARK / UPDATE ATTENDANCE
+// PATCH /students/:id/attendance
+// =========================
 router.patch("/:id/attendance", markAttendance);
 
+// =========================
+// GET SINGLE STUDENT
+// GET /students/:id
+// =========================
+router.get("/:id", getStudentById);
 
+// =========================
+// UPDATE STUDENT
+// PUT /students/:id
+// =========================
+router.put("/:id", updateStudent);
+
+// =========================
+// DELETE STUDENT
+// DELETE /students/:id
+// =========================
+router.delete("/:id", deleteStudent);
+router.patch(
+ "/bulk-attendance",
+ bulkMarkAttendance
+);
 
 module.exports = router;

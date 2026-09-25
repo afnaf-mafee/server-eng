@@ -26,64 +26,45 @@ const createStudent = async (req, res) => {
 // =========================
 const getStudents = async (req, res) => {
   try {
-
-    const {
-      studentId,
-      className,
-      name,
-      phone
-    } = req.query;
-
+    const { studentId, className, name, phone } = req.query;
 
     const filter = {};
-
 
     if (studentId) {
       filter.studentId = studentId;
     }
 
-
     if (className && className !== "all") {
       filter.className = className;
     }
 
-
     if (name) {
       filter.name = {
         $regex: name,
-        $options: "i"
+        $options: "i",
       };
     }
-
 
     if (phone) {
       filter.phone = {
-        $regex: phone
+        $regex: phone,
       };
     }
 
-
-    const students = await Student
-      .find(filter)
-      .sort({
-        createdAt: -1
-      });
-
+    const students = await Student.find(filter).sort({
+      createdAt: -1,
+    });
 
     return res.status(200).json({
       success: true,
       count: students.length,
       data: students,
     });
-
-
   } catch (error) {
-
     return res.status(500).json({
       success: false,
       message: error.message,
     });
-
   }
 };
 // =========================
@@ -118,14 +99,10 @@ const getStudentById = async (req, res) => {
 // =========================
 const updateStudent = async (req, res) => {
   try {
-    const student = await Student.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
+    const student = await Student.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
 
     if (!student) {
       return res.status(404).json({
@@ -179,10 +156,7 @@ const addFeePayment = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const {
-      amount,
-      month,
-    } = req.body;
+    const { amount, month } = req.body;
 
     // =========================
     // VALIDATION
@@ -210,7 +184,7 @@ const addFeePayment = async (req, res) => {
     // CHECK DUPLICATE MONTH
     // =========================
     const alreadyPaid = student.feePayments.find(
-      (payment) => payment.month === month
+      (payment) => payment.month === month,
     );
 
     if (alreadyPaid) {
@@ -225,11 +199,8 @@ const addFeePayment = async (req, res) => {
         },
       });
     }
-const transactionId = crypto.randomInt(
-      1000000,
-      10000000
-    );
-   
+    const transactionId = crypto.randomInt(1000000, 10000000);
+
     // =========================
     // PAYMENT DATA
     // =========================
@@ -251,7 +222,7 @@ const transactionId = crypto.randomInt(
     student.invoices.push({
       transactionId,
       amount: Number(amount),
-     
+
       paidAt: new Date(),
     });
 
@@ -285,19 +256,18 @@ const transactionId = crypto.randomInt(
 // =========================
 // MARK / UPDATE ATTENDANCE
 // =========================
+// =========================
+// MARK / UPDATE ATTENDANCE
+// =========================
+
 const markAttendance = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const {
-      date,
-      status,
-      note = "",
-    } = req.body;
+    // frontend থেকে attendanceData আসবে
+    const { date, status, note = "" } = req.body.attendanceData || req.body;
 
-    // =========================
-    // VALIDATION
-    // =========================
+    // validation
     if (!date || !status) {
       return res.status(400).json({
         success: false,
@@ -308,13 +278,10 @@ const markAttendance = async (req, res) => {
     if (!["Present", "Absent"].includes(status)) {
       return res.status(400).json({
         success: false,
-        message: "Status must be Present or Absent",
+        message: "Invalid attendance status",
       });
     }
 
-    // =========================
-    // FIND STUDENT
-    // =========================
     const student = await Student.findById(id);
 
     if (!student) {
@@ -324,41 +291,39 @@ const markAttendance = async (req, res) => {
       });
     }
 
-    // =========================
-    // CHECK SAME DATE
-    // =========================
-    const attendanceIndex = student.attendance.findIndex(
-      (item) => {
-        const itemDate = new Date(item.date)
-          .toISOString()
-          .split("T")[0];
+    // same date check
 
-        return itemDate === date;
-      }
-    );
+    const attendanceIndex = student.attendance.findIndex((item) => {
+      const itemDate = new Date(item.date).toISOString().split("T")[0];
 
-    // =========================
-    // UPDATE EXISTING ATTENDANCE
-    // =========================
+      return itemDate === date;
+    });
+
+    // update existing
+
     if (attendanceIndex !== -1) {
       student.attendance[attendanceIndex].status = status;
+
       student.attendance[attendanceIndex].note = note;
 
       await student.save();
 
       return res.status(200).json({
         success: true,
+
         message: "Attendance updated successfully",
+
         data: student.attendance[attendanceIndex],
       });
     }
 
-    // =========================
-    // CREATE NEW ATTENDANCE
-    // =========================
+    // create new
+
     const attendanceData = {
       date: new Date(`${date}T00:00:00+06:00`),
+
       status,
+
       note,
     };
 
@@ -366,23 +331,73 @@ const markAttendance = async (req, res) => {
 
     await student.save();
 
-    // =========================
-    // RESPONSE
-    // =========================
     return res.status(201).json({
       success: true,
+
       message: "Attendance marked successfully",
-      data: {
-        studentId: student.studentId,
-        studentName: student.name,
-        attendance: attendanceData,
-      },
+
+      data: attendanceData,
     });
   } catch (error) {
     console.error("Attendance Error:", error);
 
     return res.status(500).json({
       success: false,
+
+      message: error.message,
+    });
+  }
+};
+// =========================
+// BULK MARK ATTENDANCE
+// =========================
+
+const bulkMarkAttendance = async (req, res) => {
+  try {
+    const { students, date, status, note = "" } = req.body;
+
+    if (!students || students.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No students selected",
+      });
+    }
+
+    for (const studentId of students) {
+      const student = await Student.findById(studentId);
+
+      if (!student) continue;
+
+      const index = student.attendance.findIndex((item) => {
+        return new Date(item.date).toISOString().split("T")[0] === date;
+      });
+
+      if (index !== -1) {
+        student.attendance[index].status = status;
+
+        student.attendance[index].note = note;
+      } else {
+        student.attendance.push({
+          date: new Date(`${date}T00:00:00+06:00`),
+
+          status,
+
+          note,
+        });
+      }
+
+      await student.save();
+    }
+
+    res.status(200).json({
+      success: true,
+
+      message: "Attendance saved for selected students",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+
       message: error.message,
     });
   }
@@ -397,5 +412,6 @@ module.exports = {
   updateStudent,
   deleteStudent,
   addFeePayment,
-  markAttendance 
+  markAttendance,
+  bulkMarkAttendance,
 };

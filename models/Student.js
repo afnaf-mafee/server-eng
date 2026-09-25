@@ -2,8 +2,9 @@ const mongoose = require("mongoose");
 const crypto = require("crypto");
 
 const generateStudentId = () => {
-  return crypto.randomInt(100000, 999999);
+  return crypto.randomInt(100000, 999999).toString();
 };
+
 
 const feePaymentSchema = new mongoose.Schema(
   {
@@ -11,11 +12,14 @@ const feePaymentSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+
     transactionId: {
       type: Number,
       unique: true,
-      default: () => Number(Math.floor(1000000 + Math.random() * 9000000)),
+      default: () =>
+        Number(Math.floor(1000000 + Math.random() * 9000000)),
     },
+
     month: {
       type: String,
       required: true,
@@ -28,8 +32,9 @@ const feePaymentSchema = new mongoose.Schema(
   },
   {
     _id: true,
-  },
+  }
 );
+
 
 const invoiceSchema = new mongoose.Schema(
   {
@@ -50,8 +55,10 @@ const invoiceSchema = new mongoose.Schema(
   },
   {
     _id: true,
-  },
+  }
 );
+
+
 const attendanceSchema = new mongoose.Schema(
   {
     date: {
@@ -77,13 +84,16 @@ const attendanceSchema = new mongoose.Schema(
 );
 
 
+
 const studentSchema = new mongoose.Schema(
   {
+
     studentId: {
       type: String,
       unique: true,
       index: true,
     },
+
 
     name: {
       type: String,
@@ -91,91 +101,130 @@ const studentSchema = new mongoose.Schema(
       trim: true,
       maxlength: 100,
     },
+
+
     attendance: {
-        type: [attendanceSchema],
+      type: [attendanceSchema],
       default: [],
     },
+
+
     feePayments: {
       type: [feePaymentSchema],
       default: [],
     },
+
+
     className: {
       type: String,
       required: true,
       trim: true,
     },
 
+
+    // Form: Monthly Fee
     monthlyFee: {
       type: Number,
       required: true,
       min: 0,
     },
+
+
+    // Form: Admission Fee
     admissionFee: {
       type: Number,
       required: true,
       min: 0,
     },
 
-    section: {
+
+    // Form section -> batch
+    batch: {
       type: String,
       required: true,
-      enum: ["A", "B", "C"],
+      enum: ["1", "2"],
     },
 
-    guardian: {
+
+    // Form time field
+    time: {
+      type: String,
+      required: true,
+    },
+
+
+    school: {
       type: String,
       required: true,
       trim: true,
       maxlength: 100,
     },
 
+
     phone: {
       type: String,
       required: true,
-
       index: true,
       match: /^01[3-9]\d{8}$/,
     },
+
+
     invoices: {
       type: [invoiceSchema],
       default: [],
     },
+
+
     joinDate: {
       type: Date,
       default: Date.now,
     },
+
   },
+
   {
     timestamps: true,
-  },
+  }
 );
 
-// Auto generate backend student ID
+
+
+// Auto generate student ID
 studentSchema.pre("save", async function () {
+
   if (this.studentId) {
     return;
   }
+
 
   const Student = mongoose.model("Student");
 
   const MAX_RETRY = 5;
 
+
   for (let i = 0; i < MAX_RETRY; i++) {
+
     const newId = generateStudentId();
+
 
     const exists = await Student.exists({
       studentId: newId,
     });
 
+
     if (!exists) {
       this.studentId = newId;
-
       return;
     }
+
   }
 
+
   throw new Error("Unable to generate unique student ID");
+
 });
+
+
 
 const Student = mongoose.model("Student", studentSchema);
 
