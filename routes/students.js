@@ -10,7 +10,11 @@ const {
   deleteStudent,
   addFeePayment,
   markAttendance,
-  bulkMarkAttendance
+  bulkMarkAttendance,
+  addInvoice,
+  addResult,
+  sendResultsToAll,
+  makeStudentActive,
 } = require("../controllers/studentController");
 
 // =========================
@@ -18,12 +22,17 @@ const {
 // POST /students
 // =========================
 router.post("/", createStudent);
+router.post("/add-invoice", addInvoice);
 
 // =========================
 // GET ALL STUDENTS
 // GET /students
 // =========================
 router.get("/", getStudents);
+// result
+router.post("/:id/result", addResult);
+// SEND ALL RESULTS
+router.post("/send-results", sendResultsToAll);
 
 // =========================
 // ADD FEE PAYMENT
@@ -36,7 +45,7 @@ router.post("/:id/fee-payment", addFeePayment);
 // PATCH /students/:id/attendance
 // =========================
 router.patch("/:id/attendance", markAttendance);
-
+router.put("/:id/active", makeStudentActive);
 // =========================
 // GET SINGLE STUDENT
 // GET /students/:id
@@ -54,9 +63,6 @@ router.put("/:id", updateStudent);
 // DELETE /students/:id
 // =========================
 router.delete("/:id", deleteStudent);
-router.patch(
- "/bulk-attendance",
- bulkMarkAttendance
-);
+router.patch("/bulk-attendance", bulkMarkAttendance);
 
 module.exports = router;

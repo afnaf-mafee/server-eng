@@ -1,11 +1,15 @@
 const mongoose = require("mongoose");
-const crypto = require("crypto");
 
-const generateStudentId = () => {
-  return crypto.randomInt(100000, 999999).toString();
+// =========================
+// FEE PAYMENT SCHEMA
+// =========================
+const getBangladeshDate = () => {
+  return new Date(
+    new Date().toLocaleString("en-US", {
+      timeZone: "Asia/Dhaka",
+    }),
+  );
 };
-
-
 const feePaymentSchema = new mongoose.Schema(
   {
     amount: {
@@ -15,9 +19,7 @@ const feePaymentSchema = new mongoose.Schema(
 
     transactionId: {
       type: Number,
-      unique: true,
-      default: () =>
-        Number(Math.floor(1000000 + Math.random() * 9000000)),
+      default: () => Number(Math.floor(1000000 + Math.random() * 9000000)),
     },
 
     month: {
@@ -32,9 +34,64 @@ const feePaymentSchema = new mongoose.Schema(
   },
   {
     _id: true,
-  }
+  },
 );
+// =========================
+// RESULT SCHEMA
+// =========================
 
+const resultSchema = new mongoose.Schema(
+  {
+    examType: {
+      type: String,
+      required: true,
+      enum: [
+        "Item Test",
+        "Weekly Test",
+        "Monthly Test",
+        "Model Test",
+        "Grammar Test",
+        "Quiz",
+        "Final Exam",
+      ],
+    },
+
+    examNumber: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    obtainedMarks: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    // Result Send Tracking
+
+    isSent: {
+      type: Boolean,
+      default: false,
+    },
+
+    sentAt: {
+      type: Date,
+      default: null,
+    },
+
+    resultDate: {
+      type: Date,
+      required: true,
+      default: getBangladeshDate,
+    },
+  },
+  {
+    _id: true,
+  },
+);
+// =========================
+// INVOICE SCHEMA
+// =========================
 
 const invoiceSchema = new mongoose.Schema(
   {
@@ -48,6 +105,11 @@ const invoiceSchema = new mongoose.Schema(
       required: true,
     },
 
+    feeType: {
+      type: String,
+      default: "Monthly Fee",
+    },
+
     paidAt: {
       type: Date,
       default: Date.now,
@@ -55,9 +117,12 @@ const invoiceSchema = new mongoose.Schema(
   },
   {
     _id: true,
-  }
+  },
 );
 
+// =========================
+// ATTENDANCE SCHEMA
+// =========================
 
 const attendanceSchema = new mongoose.Schema(
   {
@@ -80,20 +145,20 @@ const attendanceSchema = new mongoose.Schema(
   },
   {
     _id: true,
-  }
+  },
 );
 
-
+// =========================
+// STUDENT SCHEMA
+// =========================
 
 const studentSchema = new mongoose.Schema(
   {
-
     studentId: {
       type: String,
       unique: true,
       index: true,
     },
-
 
     name: {
       type: String,
@@ -102,56 +167,50 @@ const studentSchema = new mongoose.Schema(
       maxlength: 100,
     },
 
-
     attendance: {
       type: [attendanceSchema],
       default: [],
     },
 
-
     feePayments: {
       type: [feePaymentSchema],
       default: [],
     },
-
-
+    results: {
+      type: [resultSchema],
+      default: [],
+    },
     className: {
       type: String,
       required: true,
       trim: true,
     },
 
-
-    // Form: Monthly Fee
     monthlyFee: {
       type: Number,
       required: true,
       min: 0,
     },
 
-
-    // Form: Admission Fee
     admissionFee: {
       type: Number,
       required: true,
       min: 0,
     },
-
-
-    // Form section -> batch
+    status: {
+      type: String,
+      required: true,
+    },
     batch: {
       type: String,
       required: true,
       enum: ["1", "2"],
     },
 
-
-    // Form time field
     time: {
       type: String,
       required: true,
     },
-
 
     school: {
       type: String,
@@ -160,7 +219,6 @@ const studentSchema = new mongoose.Schema(
       maxlength: 100,
     },
 
-
     phone: {
       type: String,
       required: true,
@@ -168,63 +226,85 @@ const studentSchema = new mongoose.Schema(
       match: /^01[3-9]\d{8}$/,
     },
 
-
     invoices: {
       type: [invoiceSchema],
       default: [],
     },
 
-
     joinDate: {
       type: Date,
       default: Date.now,
     },
-
   },
 
   {
     timestamps: true,
-  }
+  },
 );
 
+// =========================
+// AUTO GENERATE STUDENT ID
+// =========================
+//
+// One   -> A101, A102, A103...
+// Two   -> B101, B102, B103...
+// Three -> C101, C102, C103...
+// Four  -> D101, D102, D103...
+// Five  -> E101, E102, E103...
+// Six   -> F101, F102, F103...
+// Seven -> G101, G102, G103...
+//
 
-
-// Auto generate student ID
 studentSchema.pre("save", async function () {
-
+  // যদি আগে থেকেই ID থাকে তাহলে নতুন ID generate করবে না
   if (this.studentId) {
     return;
   }
 
-
   const Student = mongoose.model("Student");
 
-  const MAX_RETRY = 5;
+  // Class অনুযায়ী Prefix
+  const classPrefixes = {
+    One: "A",
+    Two: "B",
+    Three: "C",
+    Four: "D",
+    Five: "E",
+    Six: "F",
+    Seven: "G",
+  };
 
+  const prefix = classPrefixes[this.className];
 
-  for (let i = 0; i < MAX_RETRY; i++) {
-
-    const newId = generateStudentId();
-
-
-    const exists = await Student.exists({
-      studentId: newId,
-    });
-
-
-    if (!exists) {
-      this.studentId = newId;
-      return;
-    }
-
+  // Invalid class হলে error
+  if (!prefix) {
+    throw new Error("Invalid class name");
   }
 
+  // এই class-এর সর্বশেষ student খুঁজে বের করবে
+  const lastStudent = await Student.findOne({
+    studentId: new RegExp(`^${prefix}\\d+$`),
+  })
+    .sort({ studentId: -1 })
+    .select("studentId");
 
-  throw new Error("Unable to generate unique student ID");
+  // শুরু হবে 101 থেকে
+  let nextNumber = 101;
 
+  // যদি আগে student থাকে তাহলে তার পরের number হবে
+  if (lastStudent?.studentId) {
+    const lastNumber = parseInt(lastStudent.studentId.substring(1), 10);
+
+    nextNumber = lastNumber + 1;
+  }
+
+  // Final Student ID
+  this.studentId = `${prefix}${nextNumber}`;
 });
 
-
+// =========================
+// MODEL
+// =========================
 
 const Student = mongoose.model("Student", studentSchema);
 
