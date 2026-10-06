@@ -43,40 +43,75 @@ Thank you.
 // =========================
 const getStudents = async (req, res) => {
   try {
-    const { studentId, className, name, phone } = req.query;
+    const { search, className, batch, time } = req.query;
 
     const filter = {};
 
-    if (studentId) {
-      filter.studentId = studentId;
+    // =========================
+    // SEARCH BY NAME / ID / PHONE
+    // =========================
+    if (search) {
+      filter.$or = [
+        {
+          name: {
+            $regex: search,
+            $options: "i",
+          },
+        },
+        {
+          studentId: {
+            $regex: search,
+            $options: "i",
+          },
+        },
+        {
+          phone: {
+            $regex: search,
+            $options: "i",
+          },
+        },
+      ];
     }
 
+
+    // =========================
+    // CLASS FILTER
+    // =========================
     if (className && className !== "all") {
       filter.className = className;
     }
 
-    if (name) {
-      filter.name = {
-        $regex: name,
-        $options: "i",
-      };
+
+    // =========================
+    // BATCH FILTER
+    // =========================
+    if (batch && batch !== "all") {
+      filter.batch = batch;
     }
 
-    if (phone) {
-      filter.phone = {
-        $regex: phone,
-      };
+
+    // =========================
+    // TIME FILTER
+    // =========================
+    if (time && time !== "all") {
+      filter.time = time;
     }
 
-    const students = await Student.find(filter).sort({
-      createdAt: -1,
-    });
+
+    const students = await Student.find(filter)
+      .select("-attendance -feePayments -results -invoices")
+      .sort({
+        createdAt: -1,
+      });
+
 
     return res.status(200).json({
       success: true,
       count: students.length,
       data: students,
     });
+
+
   } catch (error) {
     return res.status(500).json({
       success: false,
