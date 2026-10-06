@@ -1,16 +1,33 @@
 const crypto = require("crypto");
 const Student = require("../models/Student");
-
+const sendSMS = require("../services/smsService");
 // =========================
 // CREATE STUDENT - POST
 // =========================
+
 const createStudent = async (req, res) => {
   try {
     const student = await Student.create(req.body);
 
+    // Send SMS after student create
+    if (student.phone) {
+      const message = `
+Dear ${student.name},
+Welcome to ELC! Your registration has been completed successfully.
+
+Your ID: ${student.studentId}
+Please keep this ID for future reference.
+
+Thank you.
+`;
+      const smsNumber = `88${student.phone}`;
+
+      await sendSMS(smsNumber, message);
+    }
+
     res.status(201).json({
       success: true,
-      message: "Student created successfully",
+      message: "Student created successfully and SMS sent",
       data: student,
     });
   } catch (error) {
@@ -236,6 +253,7 @@ const addFeePayment = async (req, res) => {
         },
       });
     }
+
     const transactionId = crypto.randomInt(1000000, 10000000);
 
     // =========================
@@ -259,7 +277,6 @@ const addFeePayment = async (req, res) => {
     student.invoices.push({
       transactionId,
       amount: Number(amount),
-
       paidAt: new Date(),
     });
 
@@ -267,6 +284,33 @@ const addFeePayment = async (req, res) => {
     // SAVE STUDENT
     // =========================
     await student.save();
+
+    // =========================
+    // SEND SMS AFTER PAYMENT
+    // =========================
+    if (student.phone) {
+      const message = `
+Dear ${student.name},
+Your fee payment has been received successfully.
+
+Student ID: ${student.studentId}
+Payment Month: ${month}
+Paid Amount: ${Number(amount)} Taka
+Transaction ID: ${transactionId}
+Payment Date: ${new Date().toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      })}
+
+Thank you for your payment.
+
+      `;
+
+      const smsNumber = `88${student.phone}`;
+
+      await sendSMS(smsNumber, message);
+    }
 
     // =========================
     // RESPONSE
@@ -329,6 +373,32 @@ const addInvoice = async (req, res) => {
 
     await student.save();
 
+    // =========================
+    // SEND SMS AFTER INVOICE
+    // =========================
+    if (student.phone) {
+      const message = `
+Dear ${student.name},
+Your ${feeType} payment has been received successfully.
+
+Student ID: ${student.studentId}
+Paid Amount: ${Number(amount)} Taka
+Transaction ID: ${transactionId}
+Payment Date: ${new Date().toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      })}
+
+Thank you for your payment.
+ELC
+`;
+
+      const smsNumber = `88${student.phone}`;
+
+      await sendSMS(smsNumber, message);
+    }
+
     return res.status(200).json({
       success: true,
       message: "Invoice created successfully",
@@ -336,7 +406,7 @@ const addInvoice = async (req, res) => {
         transactionId,
         studentId: student.studentId,
         studentName: student.name,
-        amount,
+        amount: Number(amount),
         feeType,
         paidAt: invoiceData.paidAt,
       },
@@ -459,6 +529,8 @@ const bulkMarkAttendance = async (req, res) => {
       });
     }
 
+    const absentStudents = [];
+
     for (const studentId of students) {
       const student = await Student.findById(studentId);
 
@@ -470,30 +542,57 @@ const bulkMarkAttendance = async (req, res) => {
 
       if (index !== -1) {
         student.attendance[index].status = status;
-
         student.attendance[index].note = note;
       } else {
         student.attendance.push({
           date: new Date(`${date}T00:00:00+06:00`),
-
           status,
-
           note,
         });
       }
 
       await student.save();
+
+      // Store absent students for SMS
+      if (status === "Absent" && student.phone) {
+        absentStudents.push(student);
+      }
     }
 
-    res.status(200).json({
-      success: true,
+    // =========================
+    // SEND ABSENT SMS
+    // =========================
 
-      message: "Attendance saved for selected students",
+    for (const student of absentStudents) {
+      const formattedDate = new Date(date).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+      });
+
+      const message = `
+Dear Guardian,
+
+Your child ${student.name} (Class ${student.className}) is marked absent at ELC on ${formattedDate}.
+
+Please reply with the reason for absence.
+
+Thank you,
+ELC Office.
+`;
+
+      const smsNumber = `88${student.phone}`;
+
+      await sendSMS(smsNumber, message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Attendance saved and absent SMS sent successfully",
+      smsSent: absentStudents.length,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-
       message: error.message,
     });
   }
@@ -595,7 +694,6 @@ const sendResultsToAll = async (req, res) => {
     if (students.length === 0) {
       return res.status(404).json({
         success: false,
-
         message: "No pending results found",
       });
     }
@@ -608,8 +706,28 @@ const sendResultsToAll = async (req, res) => {
       );
 
       if (pendingResults.length > 0) {
-        // এখানে Email/SMS API call হবে
+        // Latest result
+        const result = pendingResults[pendingResults.length - 1];
 
+        const message = `
+Dear Guardian,
+
+Your child ${student.name} (Class ${student.className}) result has been published at ELC.
+
+Exam: ${result.examType}
+Marks: ${result.obtainedMarks}
+
+Thank you,
+ELC Office.
+`;
+
+        if (student.phone) {
+          const smsNumber = `88${student.phone}`;
+
+          await sendSMS(smsNumber, message);
+        }
+
+        // update tracking
         pendingResults.forEach((result) => {
           result.isSent = true;
 
@@ -624,7 +742,7 @@ const sendResultsToAll = async (req, res) => {
 
         sentResults.push({
           student: student.name,
-
+          phone: student.phone,
           results: pendingResults.length,
         });
       }
@@ -633,7 +751,7 @@ const sendResultsToAll = async (req, res) => {
     return res.status(200).json({
       success: true,
 
-      message: "Results sent successfully",
+      message: "All results sent successfully",
 
       data: sentResults,
     });
@@ -676,7 +794,51 @@ const getStudentResults = async (req, res) => {
     });
   }
 };
+const getResultRanking = async (req, res) => {
+  try {
+    const students = await Student.find();
 
+    let ranking = [];
+
+    students.forEach((student) => {
+      student.results.forEach((result) => {
+        ranking.push({
+          name: student.name,
+
+          studentId: student.studentId,
+
+          className: student.className,
+
+          examType: result.examType,
+
+          examNumber: result.examNumber,
+
+          obtainedMarks: result.obtainedMarks,
+        });
+      });
+    });
+
+    ranking.sort((a, b) => b.obtainedMarks - a.obtainedMarks);
+
+    ranking = ranking.map((item, index) => ({
+      ...item,
+
+      rank: index + 1,
+    }));
+
+    res.json({
+      success: true,
+
+      data: ranking,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+
+      message: error.message,
+    });
+  }
+};
 // =========================
 // UPDATE RESULT
 // =========================
@@ -773,5 +935,5 @@ module.exports = {
   addInvoice,
   addResult,
   sendResultsToAll,
-  makeStudentActive
+  makeStudentActive,
 };
