@@ -96,7 +96,7 @@ const getTodayCollection = async (req, res) => {
                 feeType: invoice.feeType,
 
                 amount: Number(invoice.amount),
-               
+
                 transactionId: invoice.transactionId,
 
                 paidAt: new Intl.DateTimeFormat("en-GB", {
@@ -223,6 +223,86 @@ const getStudents = async (req, res) => {
     });
   }
 };
+
+
+
+
+const studentFeeHistory= async (req, res) => {
+  try {
+    const { search, className, batch, time } = req.query;
+
+    const filter = {};
+
+    // =========================
+    // SEARCH BY NAME / ID / PHONE
+    // =========================
+    if (search) {
+      filter.$or = [
+        {
+          name: {
+            $regex: search,
+            $options: "i",
+          },
+        },
+        {
+          studentId: {
+            $regex: search,
+            $options: "i",
+          },
+        },
+        {
+          phone: {
+            $regex: search,
+            $options: "i",
+          },
+        },
+      ];
+    }
+
+    // =========================
+    // CLASS FILTER
+    // =========================
+    if (className && className !== "all") {
+      filter.className = className;
+    }
+
+    // =========================
+    // BATCH FILTER
+    // =========================
+    if (batch && batch !== "all") {
+      filter.batch = batch;
+    }
+
+    // =========================
+    // TIME FILTER
+    // =========================
+    if (time && time !== "all") {
+      filter.time = time;
+    }
+
+    const students = await Student.find(filter)
+      .select(" -results -attendance ")
+      .sort({
+        createdAt: -1,
+      });
+
+    return res.status(200).json({
+      success: true,
+      count: students.length,
+      data: students,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+
+
+
+
 // =========================
 // GET SINGLE STUDENT - GET
 // =========================
@@ -558,12 +638,136 @@ ELC
   }
 };
 
-// =========================
-// MARK / UPDATE ATTENDANCE
-// =========================
-// =========================
-// MARK / UPDATE ATTENDANCE
-// =========================
+// ==========================================
+// RESULT RANKING BY DATE + CLASS + BATCH + TIME
+// ==========================================
+
+const getResultRankingByDate = async (req, res) => {
+  try {
+    const { date, className, batch, time } = req.query;
+
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: "Date is required (YYYY-MM-DD)",
+      });
+    }
+
+    // ===============================
+    // Bangladesh Date Range
+    // ===============================
+
+    const start = new Date(`${date}T00:00:00+06:00`);
+
+    const end = new Date(`${date}T23:59:59.999+06:00`);
+
+    // ===============================
+    // Student Filter
+    // ===============================
+
+    const filter = {};
+
+    if (className && className !== "all") {
+      filter.className = className;
+    }
+
+    if (batch && batch !== "all") {
+      filter.batch = batch;
+    }
+
+    if (time && time !== "all") {
+      filter.time = time;
+    }
+
+    const students = await Student.find(filter).select(
+      "name studentId className batch time results",
+    );
+
+    let ranking = [];
+
+    // ===============================
+    // Check Result Publish Date
+    // ===============================
+
+    students.forEach((student) => {
+      student.results.forEach((result) => {
+        const resultDate = new Date(result.resultDate);
+
+        if (resultDate >= start && resultDate <= end) {
+          ranking.push({
+            name: student.name,
+
+            studentId: student.studentId,
+
+            className: student.className,
+
+            batch: student.batch,
+
+            time: student.time,
+
+            examType: result.examType,
+
+            examNumber: result.examNumber,
+
+            obtainedMarks: result.obtainedMarks,
+
+            percentage: result.percentage,
+
+            publishedDate: new Intl.DateTimeFormat("en-GB", {
+              timeZone: "Asia/Dhaka",
+              day: "2-digit",
+              month: "long",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: true,
+            }).format(resultDate),
+          });
+        }
+      });
+    });
+
+    // ===============================
+    // Highest Mark First
+    // ===============================
+
+    ranking.sort((a, b) => b.obtainedMarks - a.obtainedMarks);
+
+    // ===============================
+    // Add Rank
+    // ===============================
+
+    ranking = ranking.map((item, index) => ({
+      rank: index + 1,
+
+      ...item,
+    }));
+
+    return res.status(200).json({
+      success: true,
+
+      filter: {
+        date,
+
+        className: className || "all",
+
+        batch: batch || "all",
+
+        time: time || "all",
+      },
+
+      totalResult: ranking.length,
+
+      data: ranking,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+
+      message: error.message,
+    });
+  }
+};
 
 const markAttendance = async (req, res) => {
   try {
@@ -1076,4 +1280,6 @@ module.exports = {
   sendResultsToAll,
   makeStudentActive,
   getTodayCollection,
+  getResultRankingByDate,
+  studentFeeHistory
 };
