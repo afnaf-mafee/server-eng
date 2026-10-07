@@ -15,6 +15,7 @@ const {
   addResult,
   sendResultsToAll,
   makeStudentActive,
+  getTodayCollection,
 } = require("../controllers/studentController");
 
 // =========================
@@ -33,6 +34,7 @@ router.get("/", getStudents);
 router.post("/:id/result", addResult);
 // SEND ALL RESULTS
 router.post("/send-results", sendResultsToAll);
+router.get("/today-collection", getTodayCollection);
 
 // =========================
 // ADD FEE PAYMENT

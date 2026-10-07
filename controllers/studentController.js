@@ -37,6 +37,117 @@ Thank you.
     });
   }
 };
+// ==========================================
+// TODAY COLLECTION REPORT
+// ==========================================
+// ==========================================
+// TODAY COLLECTION REPORT (BANGLADESH TIME)
+// ==========================================
+
+const getTodayCollection = async (req, res) => {
+  try {
+    const { feeType } = req.query;
+
+    // ===============================
+    // Bangladesh Date Range
+    // ===============================
+
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Dhaka",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+
+    const today = formatter.format(new Date());
+
+    const start = new Date(`${today}T00:00:00+06:00`);
+
+    const end = new Date(`${today}T23:59:59.999+06:00`);
+
+    // ===============================
+    // Get Students Invoice
+    // ===============================
+
+    const students = await Student.find().select("name studentId invoices");
+
+    let collections = [];
+
+    students.forEach((student) => {
+      if (student.invoices && student.invoices.length > 0) {
+        student.invoices.forEach((invoice) => {
+          const paidDate = new Date(invoice.paidAt);
+
+          // ===============================
+          // Bangladesh Today Check
+          // ===============================
+
+          if (paidDate >= start && paidDate <= end) {
+            // ===============================
+            // Fee Type Filter
+            // ===============================
+
+            if (!feeType || feeType === "all" || invoice.feeType === feeType) {
+              collections.push({
+                name: student.name,
+
+                studentId: student.studentId,
+
+                feeType: invoice.feeType,
+
+                amount: Number(invoice.amount),
+               
+                transactionId: invoice.transactionId,
+
+                paidAt: new Intl.DateTimeFormat("en-GB", {
+                  timeZone: "Asia/Dhaka",
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: true,
+                }).format(paidDate),
+              });
+            }
+          }
+        });
+      }
+    });
+
+    // ===============================
+    // Total Collection
+    // ===============================
+
+    const totalAmount = collections.reduce(
+      (total, item) => total + item.amount,
+      0,
+    );
+
+    return res.status(200).json({
+      success: true,
+
+      date: new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Dhaka",
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      }).format(new Date()),
+
+      totalAmount,
+
+      count: collections.length,
+
+      data: collections,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+
+      message: error.message,
+    });
+  }
+};
 
 // =========================
 // GET ALL STUDENTS - GET
@@ -73,14 +184,12 @@ const getStudents = async (req, res) => {
       ];
     }
 
-
     // =========================
     // CLASS FILTER
     // =========================
     if (className && className !== "all") {
       filter.className = className;
     }
-
 
     // =========================
     // BATCH FILTER
@@ -89,7 +198,6 @@ const getStudents = async (req, res) => {
       filter.batch = batch;
     }
 
-
     // =========================
     // TIME FILTER
     // =========================
@@ -97,21 +205,17 @@ const getStudents = async (req, res) => {
       filter.time = time;
     }
 
-
     const students = await Student.find(filter)
       .select("-attendance -feePayments -results -invoices")
       .sort({
         createdAt: -1,
       });
 
-
     return res.status(200).json({
       success: true,
       count: students.length,
       data: students,
     });
-
-
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -971,4 +1075,5 @@ module.exports = {
   addResult,
   sendResultsToAll,
   makeStudentActive,
+  getTodayCollection,
 };
